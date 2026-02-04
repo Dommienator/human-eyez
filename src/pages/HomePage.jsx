@@ -197,9 +197,9 @@ const HomePage = () => {
         <h2 style={styles.sectionTitle}>Our Guarantees</h2>
         <div style={styles.guaranteesList}>
           <div style={styles.guarantee}>✅ 0% AI Detection</div>
-          <div style={styles.guarantee}>✅ Mandatory Fact-Checking</div>
+          <div style={styles.guarantee}>✅ Comprehensive Fact-Checking</div>
           <div style={styles.guarantee}>✅ Meaning Preserved</div>
-          <div style={styles.guarantee}>✅ 1 Free Revision</div>
+          <div style={styles.guarantee}>✅ Free Revision</div>
         </div>
       </section>
 
