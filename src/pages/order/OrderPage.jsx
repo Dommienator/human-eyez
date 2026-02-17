@@ -124,7 +124,7 @@ const OrderPage = () => {
       dueDate.setHours(dueDate.getHours() + pricing.turnaround);
 
       const orderData = {
-        customer_id: null, // Remove this for now due to permission issues
+        customer_id: null,
         customer_email: user.email,
         service_category: service,
         service_tier: tier,
@@ -146,9 +146,10 @@ const OrderPage = () => {
 
       if (result) {
         sessionStorage.removeItem("pendingOrder");
-        alert(
-          `Order ${result.order_number} created successfully! Redirecting to payment...`,
-        );
+
+        // Send emails
+        console.log("✅ Order created:", result.order_number);
+
         navigate(
           `/payment?order=${result.order_number}&amount=${pricing.total}`,
         );
@@ -254,6 +255,7 @@ const OrderPage = () => {
       width: "100%",
       boxShadow: "0 4px 12px rgba(80, 173, 181, 0.3)",
       opacity: submitting ? 0.6 : 1,
+      transition: "all 0.3s",
     },
     factCheckNote: {
       background: "#fff9e6",
@@ -314,6 +316,7 @@ const OrderPage = () => {
       fontWeight: "700",
       cursor: "pointer",
       border: "none",
+      transition: "all 0.3s",
     },
     loginButton: {
       background: "#6B4A8A",
@@ -381,6 +384,10 @@ const OrderPage = () => {
               style={styles.submitButton}
               onClick={handleSubmit}
               disabled={submitting}
+              onMouseEnter={(e) =>
+                !submitting && (e.target.style.transform = "translateY(-2px)")
+              }
+              onMouseLeave={(e) => (e.target.style.transform = "translateY(0)")}
             >
               {submitting ? "Creating Order..." : "Proceed to Payment →"}
             </button>

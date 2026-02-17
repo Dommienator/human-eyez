@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { signIn } from "../services/supabase";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -22,7 +22,6 @@ const LoginPage = () => {
       setError(error.message);
       setLoading(false);
     } else {
-      // Check if there's a pending order
       const pendingOrder = sessionStorage.getItem("pendingOrder");
       if (pendingOrder) {
         navigate("/order");
@@ -45,6 +44,7 @@ const LoginPage = () => {
       background: "white",
       borderRadius: "16px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+      flexGrow: 1,
     },
     title: {
       fontSize: "2.5rem",
@@ -68,11 +68,17 @@ const LoginPage = () => {
       color: "#5A3A79",
     },
     input: {
-      padding: "1rem",
+      padding: "0.9rem",
       fontSize: "1rem",
       border: "2px solid #ddd",
       borderRadius: "8px",
-      fontFamily: "inherit",
+    },
+    error: {
+      background: "#ffebee",
+      color: "#c62828",
+      padding: "1rem",
+      borderRadius: "8px",
+      textAlign: "center",
     },
     button: {
       background: "#6B4A8A",
@@ -85,13 +91,6 @@ const LoginPage = () => {
       cursor: "pointer",
       marginTop: "1rem",
     },
-    error: {
-      background: "#ffebee",
-      color: "#c62828",
-      padding: "1rem",
-      borderRadius: "8px",
-      textAlign: "center",
-    },
     footer: {
       textAlign: "center",
       marginTop: "2rem",
@@ -99,8 +98,8 @@ const LoginPage = () => {
     },
     link: {
       color: "#6B4A8A",
-      fontWeight: "600",
       textDecoration: "none",
+      fontWeight: "600",
     },
   };
 
@@ -144,7 +143,7 @@ const LoginPage = () => {
         <div style={styles.footer}>
           Don't have an account?{" "}
           <Link to="/signup" style={styles.link}>
-            Sign up
+            Sign Up
           </Link>
         </div>
       </div>

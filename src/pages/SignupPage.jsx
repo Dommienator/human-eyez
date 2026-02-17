@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { signUp } from "../services/supabase";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -35,14 +35,8 @@ const SignupPage = () => {
       setError(error.message);
       setLoading(false);
     } else {
-      alert("Account created successfully!");
-      // Check if there's a pending order
-      const pendingOrder = sessionStorage.getItem("pendingOrder");
-      if (pendingOrder) {
-        navigate("/order");
-      } else {
-        navigate("/");
-      }
+      alert("Account created successfully! You can now login.");
+      navigate("/login");
     }
   };
 
@@ -59,6 +53,7 @@ const SignupPage = () => {
       background: "white",
       borderRadius: "16px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+      flexGrow: 1,
     },
     title: {
       fontSize: "2.5rem",
@@ -82,11 +77,17 @@ const SignupPage = () => {
       color: "#5A3A79",
     },
     input: {
-      padding: "1rem",
+      padding: "0.9rem",
       fontSize: "1rem",
       border: "2px solid #ddd",
       borderRadius: "8px",
-      fontFamily: "inherit",
+    },
+    error: {
+      background: "#ffebee",
+      color: "#c62828",
+      padding: "1rem",
+      borderRadius: "8px",
+      textAlign: "center",
     },
     button: {
       background: "#6B4A8A",
@@ -99,13 +100,6 @@ const SignupPage = () => {
       cursor: "pointer",
       marginTop: "1rem",
     },
-    error: {
-      background: "#ffebee",
-      color: "#c62828",
-      padding: "1rem",
-      borderRadius: "8px",
-      textAlign: "center",
-    },
     footer: {
       textAlign: "center",
       marginTop: "2rem",
@@ -113,8 +107,8 @@ const SignupPage = () => {
     },
     link: {
       color: "#6B4A8A",
-      fontWeight: "600",
       textDecoration: "none",
+      fontWeight: "600",
     },
   };
 
@@ -123,7 +117,7 @@ const SignupPage = () => {
       <Header />
 
       <div style={styles.container}>
-        <h1 style={styles.title}>Sign Up</h1>
+        <h1 style={styles.title}>Create Account</h1>
 
         {error && <div style={styles.error}>{error}</div>}
 
@@ -173,7 +167,7 @@ const SignupPage = () => {
           </div>
 
           <button type="submit" style={styles.button} disabled={loading}>
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? "Creating Account..." : "Sign Up"}
           </button>
         </form>
 

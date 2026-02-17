@@ -5,19 +5,22 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
   const [notes, setNotes] = useState(order.admin_notes || "");
   const [uploadedFile, setUploadedFile] = useState(null);
 
-  const handleStatusUpdate = () => {
-    onUpdate({
+  const handleStatusUpdate = async () => {
+    await onUpdate({
       ...order,
       status,
       admin_notes: notes,
     });
+
+    console.log("Order updated:", order.order_number);
+    alert("Order updated successfully!");
   };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       setUploadedFile(file);
-      alert(`File "${file.name}" ready to upload (File storage coming soon)`);
+      alert("File ready: " + file.name);
     }
   };
 
@@ -137,13 +140,10 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
       fontWeight: "700",
       cursor: "pointer",
       border: "none",
+      transition: "all 0.3s",
     },
     saveButton: {
       background: "#50ADB5",
-      color: "white",
-    },
-    downloadButton: {
-      background: "#6B4A8A",
       color: "white",
     },
     cancelButton: {
@@ -163,7 +163,6 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
         </div>
 
         <div style={styles.body}>
-          {/* Order Information */}
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Order Information</h3>
             <div style={styles.grid}>
@@ -193,32 +192,18 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
                 <span style={styles.label}>Total Price</span>
                 <div style={styles.value}>${order.total_price}</div>
               </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Rush Delivery</span>
-                <div style={styles.value}>
-                  {order.rush_delivery ? "Yes" : "No"}
-                </div>
-              </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Enhanced Fact-Check</span>
-                <div style={styles.value}>
-                  {order.enhanced_fact_check ? "Yes" : "No"}
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Original Content */}
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Original Content</h3>
             <textarea
               style={styles.textarea}
-              value={order.original_text || "File uploaded (download below)"}
+              value={order.original_text || "File uploaded"}
               readOnly
             />
           </div>
 
-          {/* Status Management */}
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Update Status</h3>
             <div style={styles.field}>
@@ -236,7 +221,6 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
             </div>
           </div>
 
-          {/* Upload Humanized Content */}
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Upload Humanized Content</h3>
             <label htmlFor="humanized-upload" style={styles.uploadArea}>
@@ -250,33 +234,22 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
               <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📤</div>
               <div style={{ fontWeight: "600", color: "#5A3A79" }}>
                 {uploadedFile
-                  ? `✓ ${uploadedFile.name}`
-                  : "Click to upload humanized document"}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.9rem",
-                  color: "#6b7e85",
-                  marginTop: "0.5rem",
-                }}
-              >
-                Supports: .txt, .doc, .docx, .pdf
+                  ? "File: " + uploadedFile.name
+                  : "Click to upload"}
               </div>
             </label>
           </div>
 
-          {/* Admin Notes */}
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Admin Notes</h3>
             <textarea
               style={styles.textarea}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add internal notes about this order..."
+              placeholder="Add internal notes..."
             />
           </div>
 
-          {/* Action Buttons */}
           <div style={styles.buttonGroup}>
             <button
               style={{ ...styles.button, ...styles.saveButton }}

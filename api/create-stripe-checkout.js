@@ -1,0 +1,39 @@
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const { orderNumber, amount } = req.body;
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `HumanEyez Order ${orderNumber}`,
+              description: "AI Content Humanization Service",
+            },
+            unit_amount: Math.round(amount * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: `${process.env.REACT_APP_SITE_URL || "http://localhost:3003"}/payment-success?order=${orderNumber}`,
+      cancel_url: `${process.env.REACT_APP_SITE_URL || "http://localhost:3003"}/payment?order=${orderNumber}&amount=${amount}`,
+      metadata: {
+        orderNumber,
+      },
+    });
+
+    res.status(200).json({ sessionId: session.id });
+  } catch (error) {
+    console.error("Stripe error:", error);
+    res.status(500).json({ error: error.message });
+  }
+}
