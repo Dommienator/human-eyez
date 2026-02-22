@@ -1,96 +1,92 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { loadStripe } from "@stripe/stripe-js";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { supabase } from "../services/supabase";
+import { supabase, createNotification } from "../services/supabase";
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY || "");
 
 const PaymentPage = () => {
   const [searchParams] = useSearchParams();
-  const [paymentMethod, setPaymentMethod] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
   const navigate = useNavigate();
 
-  const orderNumber = searchParams.get("order");
   const amount = searchParams.get("amount");
+  const [isLocal] = useState(window.location.hostname === "localhost");
+  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const [mpesaPhone, setMpesaPhone] = useState("");
 
   const handleStripePayment = async () => {
     setProcessing(true);
+    setSelectedMethod("stripe");
 
     try {
-      // Call backend to create Stripe checkout session
+      const orderDataString = sessionStorage.getItem("orderToCreate");
+      if (!orderDataString) {
+        alert("Order data not found");
+        navigate("/order");
+        return;
+      }
+
+      const orderData = JSON.parse(orderDataString);
+
+      // Create Stripe checkout session
       const response = await fetch("/api/create-stripe-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderNumber,
           amount: parseFloat(amount),
+          orderData: orderData,
         }),
       });
 
       const { sessionId } = await response.json();
-      const stripe = await stripePromise;
 
-      // Redirect to Stripe Checkout
+      // Redirect to Stripe checkout
+      const stripe = await stripePromise;
       const { error } = await stripe.redirectToCheckout({ sessionId });
 
       if (error) {
-        alert("Payment failed: " + error.message);
+        console.error("Stripe error:", error);
+        alert("Payment failed. Please try again.");
         setProcessing(false);
       }
     } catch (error) {
-      console.error("Stripe error:", error);
+      console.error("Error:", error);
       alert("Payment failed. Please try again.");
       setProcessing(false);
     }
   };
 
-  const handlePayPalApprove = async (data, actions) => {
-    setProcessing(true);
-
-    try {
-      // Capture the payment
-      const details = await actions.order.capture();
-
-      // Update order status
-      await supabase
-        .from("orders")
-        .update({
-          payment_status: "paid",
-          status: "pending",
-          payment_method: "paypal",
-        })
-        .eq("order_number", orderNumber);
-
-      alert("Payment successful!");
-      navigate("/my-orders");
-    } catch (error) {
-      console.error("PayPal error:", error);
-      alert("Payment failed.");
-      setProcessing(false);
-    }
-  };
-
   const handleMpesaPayment = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
-      alert("Please enter a valid phone number (e.g., 0712345678)");
+    if (!mpesaPhone || mpesaPhone.length < 10) {
+      alert("Please enter a valid phone number");
       return;
     }
 
     setProcessing(true);
+    setSelectedMethod("mpesa");
 
     try {
+      const orderDataString = sessionStorage.getItem("orderToCreate");
+      if (!orderDataString) {
+        alert("Order data not found");
+        navigate("/order");
+        return;
+      }
+
+      const orderData = JSON.parse(orderDataString);
+
+      // Initiate M-Pesa STK Push
       const response = await fetch("/api/mpesa-stk-push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phoneNumber,
+          phone: mpesaPhone,
           amount: parseFloat(amount),
-          orderNumber,
+          orderNumber: "PENDING", // Will be created after payment
+          orderData: orderData,
         }),
       });
 
@@ -98,73 +94,133 @@ const PaymentPage = () => {
 
       if (result.success) {
         alert(
-          "Check your phone for M-Pesa payment prompt. Enter your PIN to complete payment.",
+          "✅ M-Pesa prompt sent to your phone! Enter your PIN to complete payment.",
         );
-        // Poll for payment status
-        checkMpesaStatus(orderNumber);
+        // Poll for payment confirmation
+        startMpesaPolling(result.checkoutRequestID, orderData);
       } else {
-        alert("M-Pesa request failed: " + result.message);
+        alert("M-Pesa payment failed: " + result.message);
         setProcessing(false);
       }
     } catch (error) {
-      console.error("M-Pesa error:", error);
-      alert("M-Pesa payment failed.");
+      console.error("Error:", error);
+      alert("Payment failed. Please try again.");
       setProcessing(false);
     }
   };
 
-  const checkMpesaStatus = async (orderNum) => {
-    const checkInterval = setInterval(async () => {
-      const { data } = await supabase
-        .from("orders")
-        .select("payment_status")
-        .eq("order_number", orderNum)
-        .single();
+  const startMpesaPolling = (checkoutRequestID, orderData) => {
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds
 
-      if (data?.payment_status === "paid") {
-        clearInterval(checkInterval);
-        alert("Payment confirmed!");
-        navigate("/my-orders");
+    const pollInterval = setInterval(async () => {
+      attempts++;
+
+      try {
+        // Check payment status (you'd need to create this endpoint)
+        const response = await fetch(
+          `/api/mpesa-check-status?id=${checkoutRequestID}`,
+        );
+        const result = await response.json();
+
+        if (result.status === "completed") {
+          clearInterval(pollInterval);
+          await createOrderAfterPayment(orderData);
+        } else if (result.status === "failed" || attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          alert("Payment failed or timed out");
+          setProcessing(false);
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
       }
-    }, 3000); // Check every 3 seconds
-
-    // Stop checking after 2 minutes
-    setTimeout(() => {
-      clearInterval(checkInterval);
-      setProcessing(false);
-    }, 120000);
+    }, 1000);
   };
 
-  // TEMPORARY: Simulate payment for testing
-  const handleSimulatePayment = async () => {
+  const simulatePayment = async () => {
     setProcessing(true);
+    setSelectedMethod("simulate");
 
-    setTimeout(async () => {
-      await supabase
-        .from("orders")
-        .update({
+    const orderDataString = sessionStorage.getItem("orderToCreate");
+    if (!orderDataString) {
+      alert("Order data not found. Please start over.");
+      navigate("/order");
+      return;
+    }
+
+    const orderData = JSON.parse(orderDataString);
+    await createOrderAfterPayment(orderData);
+  };
+
+  const createOrderAfterPayment = async (orderData) => {
+    console.log("💳 Payment successful, creating order...");
+
+    // Generate order number
+    const generateOrderNumber = () => {
+      const year = new Date().getFullYear();
+      const random = Math.floor(Math.random() * 100000);
+      const timestamp = Date.now().toString().slice(-5);
+      return `HE${year}${random}${timestamp}`;
+    };
+
+    const orderNumber = generateOrderNumber();
+    console.log("📦 Generated order number:", orderNumber);
+
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([
+        {
+          ...orderData,
+          order_number: orderNumber,
           payment_status: "paid",
-          status: "pending",
-        })
-        .eq("order_number", orderNumber);
+          status: "in-progress",
+        },
+      ])
+      .select()
+      .single();
 
+    if (error) {
+      console.error("❌ FULL ERROR:", error);
+      alert(`Failed to create order. Error: ${error.message}`);
       setProcessing(false);
-      alert("Payment simulated successfully!");
+      return;
+    }
+
+    console.log("✅ Order created:", data);
+
+    // Clear session
+    sessionStorage.removeItem("orderToCreate");
+
+    // Notify customer
+    await createNotification(
+      orderData.customer_email,
+      "new_order",
+      "Order Placed Successfully! 🎉",
+      `Your order #${data.order_number} has been received and is being processed.`,
+      "/my-orders",
+    );
+
+    // Notify admin
+    await createNotification(
+      "dommienik@yahoo.com",
+      "new_order",
+      `New Order: #${data.order_number}`,
+      `${orderData.customer_email} placed a new order. ${orderData.word_count} words, $${orderData.total_price}`,
+      "/admin",
+    );
+
+    setTimeout(() => {
+      alert("✅ Payment Successful! Your order is being processed.");
       navigate("/my-orders");
     }, 2000);
   };
-
   const styles = {
-    page: {
-      minHeight: "100vh",
-      display: "flex",
-      flexDirection: "column",
-    },
+    page: { minHeight: "100vh", display: "flex", flexDirection: "column" },
     container: {
-      maxWidth: "700px",
-      margin: "3rem auto",
+      maxWidth: "600px",
+      margin: "8rem auto",
       padding: "0 2rem",
-      flexGrow: 1,
+      textAlign: "center",
     },
     card: {
       background: "white",
@@ -172,113 +228,86 @@ const PaymentPage = () => {
       padding: "3rem",
       boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
     },
-    title: {
-      fontSize: "2.5rem",
-      color: "#5A3A79",
-      textAlign: "center",
-      marginBottom: "1rem",
+    title: { fontSize: "2rem", color: "#5A3A79", marginBottom: "1rem" },
+    amount: {
+      fontSize: "3rem",
+      fontWeight: "700",
+      color: "#6B4A8A",
+      marginBottom: "2rem",
     },
-    orderInfo: {
-      background: "#F0E8F8",
+    methodsGrid: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "1.5rem",
+      marginTop: "2rem",
+    },
+    methodCard: {
       padding: "1.5rem",
       borderRadius: "12px",
-      marginBottom: "2rem",
-    },
-    infoRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      marginBottom: "0.5rem",
-    },
-    label: {
-      fontWeight: "600",
-      color: "#6b7e85",
-    },
-    value: {
-      color: "#404c50",
-      fontWeight: "600",
-    },
-    amount: {
-      fontSize: "2.5rem",
-      color: "#6B4A8A",
-      fontWeight: "700",
-      textAlign: "center",
-      marginTop: "1rem",
-    },
-    divider: {
-      borderTop: "2px solid #ddd",
-      margin: "1.5rem 0",
-    },
-    methodsTitle: {
-      fontSize: "1.3rem",
-      fontWeight: "700",
-      color: "#5A3A79",
-      marginBottom: "1.5rem",
-      textAlign: "center",
-    },
-    methodButtons: {
-      display: "grid",
-      gap: "1rem",
-      marginBottom: "2rem",
-    },
-    methodButton: {
-      padding: "1.2rem",
-      border: "2px solid #ddd",
-      borderRadius: "12px",
+      border: "2px solid #e0e0e0",
       background: "white",
-      cursor: "pointer",
+      textAlign: "left",
       transition: "all 0.3s",
+    },
+    methodHeader: {
       display: "flex",
       alignItems: "center",
       gap: "1rem",
-      fontSize: "1.1rem",
-      fontWeight: "600",
-    },
-    methodButtonActive: {
-      border: "2px solid #6B4A8A",
-      background: "#F0E8F8",
-    },
-    methodIcon: {
-      fontSize: "2rem",
-    },
-    paymentArea: {
-      marginTop: "2rem",
-    },
-    input: {
-      width: "100%",
-      padding: "1rem",
-      fontSize: "1rem",
-      border: "2px solid #ddd",
-      borderRadius: "8px",
       marginBottom: "1rem",
     },
-    button: {
-      width: "100%",
-      padding: "1.2rem",
-      borderRadius: "30px",
-      fontSize: "1.2rem",
-      fontWeight: "700",
-      cursor: "pointer",
+    methodTitle: { fontSize: "1.2rem", fontWeight: "700", color: "#5A3A79" },
+    methodButton: {
+      padding: "1rem",
+      borderRadius: "8px",
       border: "none",
-      marginTop: "1rem",
-    },
-    primaryButton: {
       background: "#6B4A8A",
       color: "white",
+      cursor: "pointer",
+      fontSize: "1rem",
+      fontWeight: "600",
+      width: "100%",
+      transition: "all 0.3s",
     },
-    secondaryButton: {
-      background: "#50ADB5",
-      color: "white",
+    disabledCard: { opacity: 0.5, background: "#f5f5f5" },
+    disabledButton: { background: "#ccc", cursor: "not-allowed" },
+    note: {
+      fontSize: "0.9rem",
+      color: "#6b7e85",
+      marginTop: "0.5rem",
+      fontStyle: "italic",
     },
-    mpesaButton: {
-      background: "#00B900",
-      color: "white",
+    input: {
+      padding: "0.8rem",
+      borderRadius: "8px",
+      border: "2px solid #e0e0e0",
+      fontSize: "1rem",
+      width: "100%",
+      marginBottom: "1rem",
     },
-    simulateButton: {
-      background: "#f39c12",
-      color: "white",
-      marginTop: "2rem",
+    simulateCard: { border: "2px solid #f39c12", background: "#fff9e6" },
+    simulateButton: { background: "#f39c12" },
+    spinner: {
+      display: "inline-block",
+      marginLeft: "0.5rem",
+      fontSize: "1rem",
     },
   };
+
+  if (processing) {
+    return (
+      <div style={styles.page}>
+        <Header />
+        <div style={styles.container}>
+          <div style={styles.card}>
+            <h2 style={styles.title}>Processing Payment...</h2>
+            <p>Please wait while we process your {selectedMethod} payment.</p>
+            <div style={{ fontSize: "3rem", margin: "2rem 0" }}>⏳</div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -287,159 +316,113 @@ const PaymentPage = () => {
       <div style={styles.container}>
         <div style={styles.card}>
           <h1 style={styles.title}>Complete Payment</h1>
+          <div style={styles.amount}>${amount}</div>
 
-          <div style={styles.orderInfo}>
-            <div style={styles.infoRow}>
-              <span style={styles.label}>Order Number:</span>
-              <span style={styles.value}>{orderNumber}</span>
-            </div>
-            <div style={styles.divider}></div>
-            <div style={styles.amount}>${amount}</div>
-          </div>
-
-          <h2 style={styles.methodsTitle}>Choose Payment Method</h2>
-
-          <div style={styles.methodButtons}>
-            <button
+          <div style={styles.methodsGrid}>
+            {/* Stripe */}
+            <div
               style={{
-                ...styles.methodButton,
-                ...(paymentMethod === "stripe"
-                  ? styles.methodButtonActive
-                  : {}),
+                ...styles.methodCard,
+                ...(isLocal ? styles.disabledCard : {}),
               }}
-              onClick={() => setPaymentMethod("stripe")}
             >
-              <span style={styles.methodIcon}>💳</span>
-              <div>
-                <div>Credit/Debit Card</div>
-                <div style={{ fontSize: "0.85rem", color: "#6b7e85" }}>
-                  Visa, Mastercard, Amex
-                </div>
+              <div style={styles.methodHeader}>
+                <span style={{ fontSize: "2rem" }}>💳</span>
+                <span style={styles.methodTitle}>Credit/Debit Card</span>
               </div>
-            </button>
-
-            <button
-              style={{
-                ...styles.methodButton,
-                ...(paymentMethod === "paypal"
-                  ? styles.methodButtonActive
-                  : {}),
-              }}
-              onClick={() => setPaymentMethod("paypal")}
-            >
-              <span style={styles.methodIcon}>💰</span>
-              <div>
-                <div>PayPal</div>
-                <div style={{ fontSize: "0.85rem", color: "#6b7e85" }}>
-                  Pay with PayPal balance or card
-                </div>
-              </div>
-            </button>
-
-            <button
-              style={{
-                ...styles.methodButton,
-                ...(paymentMethod === "mpesa" ? styles.methodButtonActive : {}),
-              }}
-              onClick={() => setPaymentMethod("mpesa")}
-            >
-              <span style={styles.methodIcon}>📱</span>
-              <div>
-                <div>M-Pesa</div>
-                <div style={{ fontSize: "0.85rem", color: "#6b7e85" }}>
-                  Kenya mobile money
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {paymentMethod === "stripe" && (
-            <div style={styles.paymentArea}>
               <button
-                style={{ ...styles.button, ...styles.primaryButton }}
+                style={{
+                  ...styles.methodButton,
+                  ...(isLocal ? styles.disabledButton : {}),
+                }}
                 onClick={handleStripePayment}
-                disabled={processing}
+                disabled={isLocal || processing}
               >
-                {processing ? "Processing..." : "Pay with Stripe"}
+                Pay with Stripe
               </button>
+              {isLocal && (
+                <div style={styles.note}>Available on live site only</div>
+              )}
             </div>
-          )}
 
-          {paymentMethod === "paypal" && (
-            <div style={styles.paymentArea}>
-              <PayPalScriptProvider
-                options={{
-                  "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID || "test",
-                  currency: "USD",
-                }}
-              >
-                <PayPalButtons
-                  createOrder={(data, actions) => {
-                    return actions.order.create({
-                      purchase_units: [
-                        {
-                          amount: { value: amount },
-                          description: `HumanEyez Order ${orderNumber}`,
-                        },
-                      ],
-                    });
-                  }}
-                  onApprove={handlePayPalApprove}
-                  onError={(err) => {
-                    console.error("PayPal error:", err);
-                    alert("Payment failed");
-                  }}
+            {/* M-Pesa */}
+            <div
+              style={{
+                ...styles.methodCard,
+                ...(isLocal ? styles.disabledCard : {}),
+              }}
+            >
+              <div style={styles.methodHeader}>
+                <span style={{ fontSize: "2rem" }}>📱</span>
+                <span style={styles.methodTitle}>M-Pesa</span>
+              </div>
+              {!isLocal && (
+                <input
+                  type="tel"
+                  style={styles.input}
+                  placeholder="Phone: 0712345678"
+                  value={mpesaPhone}
+                  onChange={(e) => setMpesaPhone(e.target.value)}
                 />
-              </PayPalScriptProvider>
-            </div>
-          )}
-
-          {paymentMethod === "mpesa" && (
-            <div style={styles.paymentArea}>
-              <label
-                style={{
-                  fontWeight: "600",
-                  color: "#5A3A79",
-                  marginBottom: "0.5rem",
-                  display: "block",
-                }}
-              >
-                M-Pesa Phone Number
-              </label>
-              <input
-                type="tel"
-                style={styles.input}
-                placeholder="0712345678"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-              />
+              )}
               <button
-                style={{ ...styles.button, ...styles.mpesaButton }}
+                style={{
+                  ...styles.methodButton,
+                  ...(isLocal ? styles.disabledButton : {}),
+                }}
                 onClick={handleMpesaPayment}
+                disabled={isLocal || processing}
+              >
+                Pay with M-Pesa
+              </button>
+              {isLocal && (
+                <div style={styles.note}>Available on live site only</div>
+              )}
+            </div>
+
+            {/* PayPal */}
+            <div
+              style={{
+                ...styles.methodCard,
+                ...(isLocal ? styles.disabledCard : {}),
+              }}
+            >
+              <div style={styles.methodHeader}>
+                <span style={{ fontSize: "2rem" }}>💰</span>
+                <span style={styles.methodTitle}>PayPal</span>
+              </div>
+              <button
+                style={{
+                  ...styles.methodButton,
+                  ...(isLocal ? styles.disabledButton : {}),
+                }}
+                disabled={isLocal || processing}
+              >
+                Pay with PayPal
+              </button>
+              {isLocal && (
+                <div style={styles.note}>Available on live site only</div>
+              )}
+            </div>
+
+            {/* Simulate Payment */}
+            <div style={{ ...styles.methodCard, ...styles.simulateCard }}>
+              <div style={styles.methodHeader}>
+                <span style={{ fontSize: "2rem" }}>🧪</span>
+                <span style={styles.methodTitle}>Test Payment</span>
+              </div>
+              <button
+                style={{ ...styles.methodButton, ...styles.simulateButton }}
+                onClick={simulatePayment}
                 disabled={processing}
               >
-                {processing ? "Waiting for payment..." : "Pay with M-Pesa"}
+                Simulate Payment (For Testing)
               </button>
-              <p
-                style={{
-                  fontSize: "0.9rem",
-                  color: "#6b7e85",
-                  marginTop: "1rem",
-                  textAlign: "center",
-                }}
-              >
-                You will receive a prompt on your phone to enter your M-Pesa PIN
-              </p>
+              <div style={styles.note}>
+                Use this to test the order flow without real payment
+              </div>
             </div>
-          )}
-
-          {/* TEMPORARY TESTING BUTTON */}
-          <button
-            style={{ ...styles.button, ...styles.simulateButton }}
-            onClick={handleSimulatePayment}
-          >
-            🧪 Simulate Payment (Testing Only)
-          </button>
+          </div>
         </div>
       </div>
 

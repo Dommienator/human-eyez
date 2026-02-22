@@ -1,29 +1,67 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { signUp } from "../services/supabase";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { signUp } from "../services/supabase";
 
 const SignupPage = () => {
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const validatePassword = (pwd) => {
+    const requirements = {
+      length: pwd.length >= 8,
+      uppercase: /[A-Z]/.test(pwd),
+      lowercase: /[a-z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+    };
+    return requirements;
+  };
+
+  const getPasswordStrength = (pwd) => {
+    const reqs = validatePassword(pwd);
+    const score = Object.values(reqs).filter(Boolean).length;
+    if (score <= 2) return { label: "Weak", color: "#e74c3c" };
+    if (score <= 4) return { label: "Medium", color: "#f39c12" };
+    return { label: "Strong", color: "#27ae60" };
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+    const reqs = validatePassword(password);
+    if (!reqs.length) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+    if (!reqs.uppercase) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!reqs.lowercase) {
+      setError("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!reqs.number) {
+      setError("Password must contain at least one number");
+      return;
+    }
+    if (!reqs.special) {
+      setError("Password must contain at least one special character");
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
       return;
     }
 
@@ -35,10 +73,13 @@ const SignupPage = () => {
       setError(error.message);
       setLoading(false);
     } else {
-      alert("Account created successfully! You can now login.");
+      alert("Account created! Please check your email to verify your account.");
       navigate("/login");
     }
   };
+
+  const passwordReqs = validatePassword(password);
+  const strength = password ? getPasswordStrength(password) : null;
 
   const styles = {
     page: {
@@ -49,11 +90,14 @@ const SignupPage = () => {
     container: {
       maxWidth: "500px",
       margin: "5rem auto",
-      padding: "3rem",
+      padding: "0 2rem",
+      flexGrow: 1,
+    },
+    card: {
       background: "white",
+      padding: "3rem",
       borderRadius: "16px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-      flexGrow: 1,
     },
     title: {
       fontSize: "2.5rem",
@@ -77,27 +121,76 @@ const SignupPage = () => {
       color: "#5A3A79",
     },
     input: {
-      padding: "0.9rem",
+      padding: "1rem",
       fontSize: "1rem",
       border: "2px solid #ddd",
       borderRadius: "8px",
+      transition: "border-color 0.3s",
+    },
+    passwordWrapper: {
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+    },
+    passwordInput: {
+      padding: "1rem",
+      paddingRight: "3rem",
+      fontSize: "1rem",
+      border: "2px solid #ddd",
+      borderRadius: "8px",
+      width: "100%",
+      transition: "border-color 0.3s",
+    },
+    eyeIcon: {
+      position: "absolute",
+      right: "1rem",
+      cursor: "pointer",
+      fontSize: "1.2rem",
+      userSelect: "none",
+    },
+    requirements: {
+      fontSize: "0.85rem",
+      marginTop: "0.5rem",
+    },
+    requirement: {
+      display: "flex",
+      alignItems: "center",
+      gap: "0.5rem",
+      marginBottom: "0.3rem",
+    },
+    strengthBar: {
+      height: "6px",
+      borderRadius: "3px",
+      background: "#e0e0e0",
+      marginTop: "0.5rem",
+      overflow: "hidden",
+    },
+    strengthFill: {
+      height: "100%",
+      transition: "all 0.3s",
+    },
+    strengthLabel: {
+      fontSize: "0.85rem",
+      fontWeight: "600",
+      marginTop: "0.3rem",
     },
     error: {
       background: "#ffebee",
       color: "#c62828",
       padding: "1rem",
       borderRadius: "8px",
-      textAlign: "center",
+      fontSize: "0.95rem",
     },
     button: {
       background: "#6B4A8A",
       color: "white",
       border: "none",
-      padding: "1rem",
-      borderRadius: "30px",
+      padding: "1.2rem",
+      borderRadius: "8px",
       fontSize: "1.1rem",
       fontWeight: "700",
       cursor: "pointer",
+      transition: "all 0.3s",
       marginTop: "1rem",
     },
     footer: {
@@ -117,65 +210,133 @@ const SignupPage = () => {
       <Header />
 
       <div style={styles.container}>
-        <h1 style={styles.title}>Create Account</h1>
+        <div style={styles.card}>
+          <h1 style={styles.title}>Create Account</h1>
 
-        {error && <div style={styles.error}>{error}</div>}
+          {error && <div style={styles.error}>{error}</div>}
 
-        <form style={styles.form} onSubmit={handleSubmit}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Full Name</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
+          <form style={styles.form} onSubmit={handleSubmit}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Full Name</label>
+              <input
+                type="text"
+                style={styles.input}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Email</label>
+              <input
+                type="email"
+                style={styles.input}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Password</label>
+              <div style={styles.passwordWrapper}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  style={styles.passwordInput}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <span
+                  style={styles.eyeIcon}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "👁️" : "👁️‍🗨️"}
+                </span>
+              </div>
+
+              {password && (
+                <>
+                  <div style={styles.strengthBar}>
+                    <div
+                      style={{
+                        ...styles.strengthFill,
+                        width: `${(Object.values(passwordReqs).filter(Boolean).length / 5) * 100}%`,
+                        background: strength.color,
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{ ...styles.strengthLabel, color: strength.color }}
+                  >
+                    {strength.label}
+                  </div>
+
+                  <div style={styles.requirements}>
+                    <div style={styles.requirement}>
+                      <span>{passwordReqs.length ? "✅" : "❌"}</span>
+                      <span>At least 8 characters</span>
+                    </div>
+                    <div style={styles.requirement}>
+                      <span>{passwordReqs.uppercase ? "✅" : "❌"}</span>
+                      <span>One uppercase letter</span>
+                    </div>
+                    <div style={styles.requirement}>
+                      <span>{passwordReqs.lowercase ? "✅" : "❌"}</span>
+                      <span>One lowercase letter</span>
+                    </div>
+                    <div style={styles.requirement}>
+                      <span>{passwordReqs.number ? "✅" : "❌"}</span>
+                      <span>One number</span>
+                    </div>
+                    <div style={styles.requirement}>
+                      <span>{passwordReqs.special ? "✅" : "❌"}</span>
+                      <span>One special character (!@#$%^&*)</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Confirm Password</label>
+              <div style={styles.passwordWrapper}>
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  style={styles.passwordInput}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <span
+                  style={styles.eyeIcon}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              style={{
+                ...styles.button,
+                opacity: loading ? 0.6 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
+              disabled={loading}
+            >
+              {loading ? "Creating Account..." : "Sign Up"}
+            </button>
+          </form>
+
+          <div style={styles.footer}>
+            Already have an account?{" "}
+            <Link to="/login" style={styles.link}>
+              Login
+            </Link>
           </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email</label>
-            <input
-              type="email"
-              style={styles.input}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              style={styles.input}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Confirm Password</label>
-            <input
-              type="password"
-              style={styles.input}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <button type="submit" style={styles.button} disabled={loading}>
-            {loading ? "Creating Account..." : "Sign Up"}
-          </button>
-        </form>
-
-        <div style={styles.footer}>
-          Already have an account?{" "}
-          <Link to="/login" style={styles.link}>
-            Login
-          </Link>
         </div>
       </div>
 

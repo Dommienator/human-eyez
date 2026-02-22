@@ -78,8 +78,8 @@ const Footer = () => {
 
           <div style={styles.section}>
             <h3 style={styles.title}>Contact</h3>
-            <p style={styles.text}>Email: support@humaneyes.com</p>
-            <p style={styles.text}>Phone: +254 700 000 000</p>
+            <p style={styles.text}>Email: dommienik@gmail.com</p>
+            <p style={styles.text}>Phone: +254 715347200</p>
           </div>
         </div>
 

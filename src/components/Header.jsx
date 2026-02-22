@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser, signOut } from "../services/supabase";
+import NotificationBell from "./NotificationBell";
 
 const Header = () => {
   const [user, setUser] = useState(null);
@@ -24,78 +25,80 @@ const Header = () => {
   const styles = {
     header: {
       background: "linear-gradient(135deg, #6B4A8A 0%, #5A3A79 100%)",
-      padding: "1rem 0",
+      padding: "1rem 2rem",
       boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
       position: "sticky",
       top: 0,
-      zIndex: 100,
+      zIndex: 1000,
     },
-    nav: {
-      maxWidth: "1200px",
+    container: {
+      maxWidth: "1400px",
       margin: "0 auto",
-      padding: "0 2rem",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
     },
     logo: {
-      fontSize: "2rem",
-      fontFamily: "Pacifico, cursive",
       color: "white",
+      fontSize: "1.8rem",
+      fontFamily: "Pacifico, cursive",
       textDecoration: "none",
     },
-    navLinks: {
+    nav: {
       display: "flex",
-      gap: "2rem",
       alignItems: "center",
+      gap: "2rem",
     },
     link: {
       color: "white",
       textDecoration: "none",
       fontSize: "1rem",
-      fontWeight: "600",
-      transition: "color 0.3s",
+      fontWeight: "500",
+      transition: "opacity 0.3s",
+    },
+    userSection: {
+      display: "flex",
+      alignItems: "center",
+      gap: "1.5rem",
+    },
+    userName: {
+      color: "rgba(255,255,255,0.9)",
+      fontSize: "0.95rem",
     },
     button: {
       background: "#50ADB5",
       color: "white",
       border: "none",
-      padding: "0.7rem 1.5rem",
+      padding: "0.6rem 1.5rem",
       borderRadius: "25px",
       fontSize: "1rem",
-      fontWeight: "700",
+      fontWeight: "600",
       cursor: "pointer",
-      transition: "all 0.3s",
       textDecoration: "none",
       display: "inline-block",
-    },
-    userSection: {
-      display: "flex",
-      alignItems: "center",
-      gap: "1rem",
-    },
-    userName: {
-      color: "white",
-      fontSize: "0.9rem",
+      transition: "all 0.3s",
     },
     logoutBtn: {
       background: "transparent",
+      border: "2px solid white",
       color: "white",
-      border: "1px solid white",
-      padding: "0.5rem 1rem",
-      borderRadius: "20px",
-      fontSize: "0.9rem",
+      padding: "0.5rem 1.2rem",
+      borderRadius: "25px",
+      fontSize: "0.95rem",
+      fontWeight: "600",
       cursor: "pointer",
+      transition: "all 0.3s",
     },
   };
 
   return (
     <header style={styles.header}>
-      <nav style={styles.nav}>
+      <div style={styles.container}>
         <Link to="/" style={styles.logo}>
           HumanEyez
         </Link>
-        <div style={styles.navLinks}>
+
+        <nav style={styles.nav}>
           <Link to="/" style={styles.link}>
             Home
           </Link>
@@ -105,6 +108,10 @@ const Header = () => {
 
           {user ? (
             <div style={styles.userSection}>
+              <NotificationBell userEmail={user.email} />
+              <Link to="/my-orders" style={styles.link}>
+                My Orders
+              </Link>
               <span style={styles.userName}>
                 👤 {user.user_metadata?.full_name || user.email}
               </span>
@@ -125,8 +132,8 @@ const Header = () => {
               </Link>
             </>
           )}
-        </div>
-      </nav>
+        </nav>
+      </div>
     </header>
   );
 };

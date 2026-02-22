@@ -4,11 +4,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import WordCounter from "../../components/order/WordCounter";
 import PricingCalculator from "../../components/order/PricingCalculator";
-import {
-  getCurrentUser,
-  createOrder,
-  getPricingByCategory,
-} from "../../services/supabase";
+import { getCurrentUser, getPricingByCategory } from "../../services/supabase";
 
 const OrderPage = () => {
   const [user, setUser] = useState(null);
@@ -142,20 +138,13 @@ const OrderPage = () => {
         payment_status: "pending",
       };
 
-      const result = await createOrder(orderData);
+      // Save order data to session - will be created AFTER payment
+      sessionStorage.setItem("orderToCreate", JSON.stringify(orderData));
+      sessionStorage.removeItem("pendingOrder");
 
-      if (result) {
-        sessionStorage.removeItem("pendingOrder");
+      console.log("✅ Order data saved to session, redirecting to payment");
 
-        // Send emails
-        console.log("✅ Order created:", result.order_number);
-
-        navigate(
-          `/payment?order=${result.order_number}&amount=${pricing.total}`,
-        );
-      } else {
-        alert("Failed to create order. Please try again.");
-      }
+      navigate(`/payment?amount=${pricing.total}`);
     } catch (error) {
       console.error("Error creating order:", error);
       alert("An error occurred. Please try again.");
@@ -389,7 +378,7 @@ const OrderPage = () => {
               }
               onMouseLeave={(e) => (e.target.style.transform = "translateY(0)")}
             >
-              {submitting ? "Creating Order..." : "Proceed to Payment →"}
+              {submitting ? "Processing..." : "Proceed to Payment →"}
             </button>
           </div>
         </div>

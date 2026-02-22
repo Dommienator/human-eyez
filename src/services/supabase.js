@@ -311,3 +311,39 @@ export const downloadFile = async (bucket, path) => {
   }
   return data;
 };
+// ===== NOTIFICATIONS =====
+
+export const createNotification = async (userEmail, type, title, message, link = null) => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert([{ user_email: userEmail, type, title, message, link }]);
+  if (error) console.error('Error creating notification:', error);
+  return data;
+};
+
+export const getNotifications = async (userEmail) => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_email', userEmail)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) console.error('Error fetching notifications:', error);
+  return data || [];
+};
+
+export const markNotificationRead = async (notificationId) => {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', notificationId);
+  if (error) console.error('Error marking notification read:', error);
+};
+
+export const markAllNotificationsRead = async (userEmail) => {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_email', userEmail);
+  if (error) console.error('Error marking all notifications read:', error);
+};

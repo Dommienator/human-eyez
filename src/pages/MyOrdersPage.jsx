@@ -271,31 +271,24 @@ const MyOrdersPage = () => {
                 <div style={styles.orderActions}>
                   <button
                     style={{ ...styles.button, ...styles.viewButton }}
-                    onClick={() =>
-                      navigate(`/track?order=${order.order_number}`)
-                    }
-                  >
-                    View Details
-                  </button>
-                  {(order.status === "completed" ||
-                    order.status === "delivered") &&
-                  order.humanized_file_url ? (
-                    <button
-                      style={{ ...styles.button, ...styles.downloadButton }}
-                      onClick={() =>
-                        window.open(order.humanized_file_url, "_blank")
+                    onClick={() => {
+                      if (
+                        order.status === "completed" ||
+                        order.status === "delivered"
+                      ) {
+                        // Show completed order details
+                        navigate(`/order-completed/${order.order_number}`);
+                      } else {
+                        // Show tracking
+                        navigate(`/track?order=${order.order_number}`);
                       }
-                    >
-                      📥 Download
-                    </button>
-                  ) : (
-                    <button
-                      style={{ ...styles.button, ...styles.disabledButton }}
-                      disabled
-                    >
-                      Download (Not Ready)
-                    </button>
-                  )}
+                    }}
+                  >
+                    {order.status === "completed" ||
+                    order.status === "delivered"
+                      ? "View & Download"
+                      : "View Details"}
+                  </button>
                 </div>
               </div>
             ))}

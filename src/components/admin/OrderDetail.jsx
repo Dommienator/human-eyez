@@ -1,27 +1,93 @@
 import React, { useState } from "react";
+import {
+  supabase,
+  uploadHumanizedContent,
+  createNotification,
+} from "../../services/supabase";
 
 const OrderDetail = ({ order, onClose, onUpdate }) => {
   const [status, setStatus] = useState(order.status);
   const [notes, setNotes] = useState(order.admin_notes || "");
+  const [humanizedText, setHumanizedText] = useState(
+    order.humanized_text || "",
+  );
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleStatusUpdate = async () => {
-    await onUpdate({
-      ...order,
-      status,
-      admin_notes: notes,
-    });
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    console.log("Order updated:", order.order_number);
-    alert("Order updated successfully!");
+    setUploading(true);
+    const fileUrl = await uploadHumanizedContent(file, order.order_number);
+
+    if (fileUrl) {
+      setUploadedFile({ name: file.name, url: fileUrl });
+      alert("File uploaded successfully!");
+    } else {
+      alert("File upload failed");
+    }
+    setUploading(false);
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setUploadedFile(file);
-      alert("File ready: " + file.name);
+  const handleSubmitToClient = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!humanizedText && !uploadedFile && !order.humanized_file_url) {
+      alert(
+        "Please add humanized content (text or file) before submitting to client",
+      );
+      return;
     }
+
+    setSaving(true);
+
+    const updates = {
+      status: "ready-for-review",
+      admin_notes: notes,
+      humanized_text: humanizedText || null,
+      humanized_file_url: uploadedFile?.url || order.humanized_file_url || null,
+    };
+
+    console.log("💾 Saving to database:", updates);
+    console.log("📝 Text length:", humanizedText?.length || 0);
+    console.log("📄 File URL:", updates.humanized_file_url);
+
+    const { data, error } = await supabase
+      .from("orders")
+      .update(updates)
+      .eq("id", order.id)
+      .select();
+
+    if (error) {
+      console.error("❌ Database save failed:", error);
+      alert("Failed to submit: " + error.message);
+      setSaving(false);
+      return;
+    }
+
+    console.log("✅ Saved to database successfully:", data);
+
+    // Notify customer
+    try {
+      await createNotification(
+        order.customer_email,
+        "order_completed",
+        "Your Order is Ready for Review! ✅",
+        `Order #${order.order_number} is ready. Click to view and download.`,
+        `/order-completed/${order.order_number}`,
+      );
+      console.log("🔔 Customer notified");
+    } catch (error) {
+      console.error("❌ Notification failed:", error);
+    }
+
+    alert("✅ Content submitted to client! They have been notified.");
+    onUpdate({ ...order, ...updates });
+    setSaving(false);
+    onClose();
   };
 
   const styles = {
@@ -31,124 +97,145 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.8)",
+      background: "rgba(0,0,0,0.7)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      zIndex: 3000,
-      overflowY: "auto",
-      padding: "2rem 0",
+      zIndex: 9999,
+      padding: "2rem",
     },
     modal: {
       background: "white",
       borderRadius: "16px",
-      width: "90%",
-      maxWidth: "1000px",
+      maxWidth: "900px",
+      width: "100%",
       maxHeight: "90vh",
       overflow: "auto",
-      margin: "auto",
+      padding: "2rem",
     },
     header: {
-      background: "#6B4A8A",
-      color: "white",
-      padding: "2rem",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      borderRadius: "16px 16px 0 0",
+      marginBottom: "2rem",
+      paddingBottom: "1rem",
+      borderBottom: "2px solid #f0f0f0",
     },
     title: {
       fontSize: "1.8rem",
+      color: "#5A3A79",
       fontWeight: "700",
     },
-    closeButton: {
+    closeBtn: {
       background: "none",
       border: "none",
-      color: "white",
-      fontSize: "2rem",
+      fontSize: "1.5rem",
       cursor: "pointer",
-    },
-    body: {
-      padding: "2rem",
+      color: "#6b7e85",
     },
     section: {
       marginBottom: "2rem",
     },
     sectionTitle: {
-      fontSize: "1.3rem",
+      fontSize: "1.2rem",
       fontWeight: "700",
       color: "#5A3A79",
       marginBottom: "1rem",
     },
-    grid: {
+    infoGrid: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
       gap: "1rem",
+      background: "#F0E8F8",
+      padding: "1.5rem",
+      borderRadius: "8px",
     },
-    field: {
-      marginBottom: "1rem",
+    infoItem: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "0.3rem",
     },
     label: {
-      display: "block",
-      fontWeight: "600",
+      fontSize: "0.85rem",
       color: "#6b7e85",
-      marginBottom: "0.5rem",
-      fontSize: "0.9rem",
+      fontWeight: "600",
+      textTransform: "uppercase",
     },
     value: {
+      fontSize: "1rem",
       color: "#404c50",
-      fontSize: "1.1rem",
+      fontWeight: "600",
     },
     textarea: {
-      width: "100%",
-      minHeight: "200px",
       padding: "1rem",
+      fontSize: "1rem",
       border: "2px solid #ddd",
       borderRadius: "8px",
-      fontSize: "1rem",
+      width: "100%",
+      minHeight: "150px",
       fontFamily: "inherit",
       resize: "vertical",
     },
-    select: {
-      width: "100%",
-      padding: "0.8rem",
+    textEditor: {
+      padding: "1rem",
       fontSize: "1rem",
       border: "2px solid #ddd",
       borderRadius: "8px",
+      width: "100%",
+      minHeight: "300px",
+      fontFamily: "monospace",
+      resize: "vertical",
     },
-    uploadArea: {
+    fileUploadArea: {
       border: "2px dashed #6B4A8A",
       borderRadius: "8px",
       padding: "2rem",
       textAlign: "center",
-      cursor: "pointer",
-      background: "#F0E8F8",
+      background: "#fafafa",
     },
     fileInput: {
       display: "none",
     },
-    buttonGroup: {
+    uploadBtn: {
+      background: "#6B4A8A",
+      color: "white",
+      border: "none",
+      padding: "0.8rem 1.5rem",
+      borderRadius: "8px",
+      cursor: "pointer",
+      fontWeight: "600",
+      marginTop: "1rem",
+    },
+    uploadedFile: {
+      background: "#e8f5e9",
+      padding: "1rem",
+      borderRadius: "8px",
+      marginTop: "1rem",
+    },
+    actions: {
       display: "flex",
       gap: "1rem",
       marginTop: "2rem",
+      paddingTop: "2rem",
+      borderTop: "2px solid #f0f0f0",
     },
     button: {
-      flex: 1,
-      padding: "1rem",
+      padding: "1rem 2rem",
       borderRadius: "8px",
-      fontSize: "1.1rem",
+      fontSize: "1rem",
       fontWeight: "700",
       cursor: "pointer",
       border: "none",
       transition: "all 0.3s",
+      flex: 1,
     },
-    saveButton: {
-      background: "#50ADB5",
+    submitBtn: {
+      background: "#27ae60",
       color: "white",
     },
-    cancelButton: {
-      background: "#6b7e85",
-      color: "white",
+    cancelBtn: {
+      background: "#e0e0e0",
+      color: "#404c50",
     },
   };
 
@@ -157,113 +244,92 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
           <h2 style={styles.title}>Order #{order.order_number}</h2>
-          <button style={styles.closeButton} onClick={onClose}>
-            ×
+          <button style={styles.closeBtn} onClick={onClose}>
+            ✕
           </button>
         </div>
 
-        <div style={styles.body}>
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Order Information</h3>
-            <div style={styles.grid}>
-              <div style={styles.field}>
-                <span style={styles.label}>Customer Email</span>
-                <div style={styles.value}>{order.customer_email}</div>
-              </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Order Date</span>
-                <div style={styles.value}>
-                  {new Date(order.submitted_at).toLocaleString()}
-                </div>
-              </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Service</span>
-                <div style={styles.value}>{order.service_category}</div>
-              </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Tier</span>
-                <div style={styles.value}>{order.service_tier}</div>
-              </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Word Count</span>
-                <div style={styles.value}>{order.word_count} words</div>
-              </div>
-              <div style={styles.field}>
-                <span style={styles.label}>Total Price</span>
-                <div style={styles.value}>${order.total_price}</div>
-              </div>
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Order Information</h3>
+          <div style={styles.infoGrid}>
+            <div style={styles.infoItem}>
+              <span style={styles.label}>Customer</span>
+              <span style={styles.value}>{order.customer_email}</span>
+            </div>
+            <div style={styles.infoItem}>
+              <span style={styles.label}>Service</span>
+              <span style={styles.value}>{order.service_category}</span>
+            </div>
+            <div style={styles.infoItem}>
+              <span style={styles.label}>Words</span>
+              <span style={styles.value}>{order.word_count}</span>
+            </div>
+            <div style={styles.infoItem}>
+              <span style={styles.label}>Price</span>
+              <span style={styles.value}>${order.total_price}</span>
             </div>
           </div>
+        </div>
 
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Original Content</h3>
-            <textarea
-              style={styles.textarea}
-              value={order.original_text || "File uploaded"}
-              readOnly
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Original Content</h3>
+          <textarea
+            style={styles.textarea}
+            value={order.original_text || "File uploaded"}
+            readOnly
+          />
+        </div>
+
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>📝 Add Humanized Content (Text)</h3>
+          <textarea
+            style={styles.textEditor}
+            value={humanizedText}
+            onChange={(e) => setHumanizedText(e.target.value)}
+            placeholder="Type or paste the humanized content here..."
+          />
+        </div>
+
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>📄 OR Upload Humanized File</h3>
+          <div style={styles.fileUploadArea}>
+            <p>Upload .docx, .pdf, or .txt file</p>
+            <input
+              type="file"
+              id="fileUpload"
+              style={styles.fileInput}
+              onChange={handleFileUpload}
+              accept=".docx,.pdf,.txt"
             />
+            <button
+              style={styles.uploadBtn}
+              onClick={() => document.getElementById("fileUpload").click()}
+              disabled={uploading}
+            >
+              {uploading ? "Uploading..." : "Choose File"}
+            </button>
           </div>
-
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Update Status</h3>
-            <div style={styles.field}>
-              <label style={styles.label}>Order Status</label>
-              <select
-                style={styles.select}
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                <option value="pending">Pending</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="delivered">Delivered</option>
-              </select>
+          {(uploadedFile || order.humanized_file_url) && (
+            <div style={styles.uploadedFile}>
+              ✅ {uploadedFile?.name || "File uploaded"}
             </div>
-          </div>
+          )}
+        </div>
 
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Upload Humanized Content</h3>
-            <label htmlFor="humanized-upload" style={styles.uploadArea}>
-              <input
-                id="humanized-upload"
-                type="file"
-                accept=".txt,.doc,.docx,.pdf"
-                style={styles.fileInput}
-                onChange={handleFileUpload}
-              />
-              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📤</div>
-              <div style={{ fontWeight: "600", color: "#5A3A79" }}>
-                {uploadedFile
-                  ? "File: " + uploadedFile.name
-                  : "Click to upload"}
-              </div>
-            </label>
-          </div>
-
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Admin Notes</h3>
-            <textarea
-              style={styles.textarea}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add internal notes..."
-            />
-          </div>
-
-          <div style={styles.buttonGroup}>
-            <button
-              style={{ ...styles.button, ...styles.saveButton }}
-              onClick={handleStatusUpdate}
-            >
-              Save Changes
-            </button>
-            <button
-              style={{ ...styles.button, ...styles.cancelButton }}
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
+        <div style={styles.actions}>
+          <button
+            style={{ ...styles.button, ...styles.submitBtn }}
+            onClick={handleSubmitToClient}
+            disabled={saving}
+          >
+            {saving ? "Submitting..." : "✅ Submit to Client"}
+          </button>
+          <button
+            style={{ ...styles.button, ...styles.cancelBtn }}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
