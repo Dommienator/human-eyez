@@ -201,19 +201,6 @@ const OrderCompletedPage = () => {
             <p style={styles.orderNumber}>Order #{order.order_number}</p>
           </div>
 
-          <div style={styles.debugInfo}>
-            <strong>Debug Info:</strong>
-            <br />
-            Status: {order.status}
-            <br />
-            Has Text:{" "}
-            {order.humanized_text
-              ? "Yes (" + order.humanized_text.substring(0, 50) + "...)"
-              : "No"}
-            <br />
-            Has File: {order.humanized_file_url ? "Yes" : "No"}
-          </div>
-
           {order.humanized_text && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle}>📝 Humanized Content</h2>

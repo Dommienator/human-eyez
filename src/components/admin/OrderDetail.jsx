@@ -278,6 +278,26 @@ const OrderDetail = ({ order, onClose, onUpdate }) => {
             value={order.original_text || "File uploaded"}
             readOnly
           />
+          {order.original_file_url && (
+            <a
+              href={order.original_file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: "#6B4A8A",
+                fontWeight: "600",
+                marginTop: "1rem",
+                display: "inline-block",
+                textDecoration: "none",
+                padding: "0.8rem 1.5rem",
+                background: "#F0E8F8",
+                borderRadius: "8px",
+                transition: "all 0.3s",
+              }}
+            >
+              📄 Download Original File
+            </a>
+          )}
         </div>
 
         <div style={styles.section}>

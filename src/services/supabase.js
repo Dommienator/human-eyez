@@ -219,25 +219,35 @@ export const updateOrderStatus = async (orderId, status, notes = null) => {
   return data;
 };
 
-export const uploadHumanizedContent = async (orderId, fileUrl) => {
-  const { data, error } = await supabase
-    .from("orders")
-    .update({
-      humanized_file_url: fileUrl,
-      status: "completed",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", orderId)
-    .select()
-    .single();
+export const uploadHumanizedContent = async (file, orderNumber) => {
+  try {
+    // Create unique filename
+    const timestamp = Date.now();
+    const fileName = `${orderNumber}_${timestamp}_${file.name}`;
+    const filePath = `humanized/${fileName}`;
 
-  if (error) {
+    // Upload file to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("orderfiles")
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error("Error uploading file:", uploadError);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("orderfiles")
+      .getPublicUrl(filePath);
+
+    console.log("✅ File uploaded successfully:", urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch (error) {
     console.error("Error uploading content:", error);
     return null;
   }
-  return data;
 };
-
 // ===== TESTIMONIALS FUNCTIONS =====
 
 export const getTestimonials = async () => {
@@ -313,37 +323,43 @@ export const downloadFile = async (bucket, path) => {
 };
 // ===== NOTIFICATIONS =====
 
-export const createNotification = async (userEmail, type, title, message, link = null) => {
+export const createNotification = async (
+  userEmail,
+  type,
+  title,
+  message,
+  link = null,
+) => {
   const { data, error } = await supabase
-    .from('notifications')
+    .from("notifications")
     .insert([{ user_email: userEmail, type, title, message, link }]);
-  if (error) console.error('Error creating notification:', error);
+  if (error) console.error("Error creating notification:", error);
   return data;
 };
 
 export const getNotifications = async (userEmail) => {
   const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_email', userEmail)
-    .order('created_at', { ascending: false })
+    .from("notifications")
+    .select("*")
+    .eq("user_email", userEmail)
+    .order("created_at", { ascending: false })
     .limit(20);
-  if (error) console.error('Error fetching notifications:', error);
+  if (error) console.error("Error fetching notifications:", error);
   return data || [];
 };
 
 export const markNotificationRead = async (notificationId) => {
   const { error } = await supabase
-    .from('notifications')
+    .from("notifications")
     .update({ read: true })
-    .eq('id', notificationId);
-  if (error) console.error('Error marking notification read:', error);
+    .eq("id", notificationId);
+  if (error) console.error("Error marking notification read:", error);
 };
 
 export const markAllNotificationsRead = async (userEmail) => {
   const { error } = await supabase
-    .from('notifications')
+    .from("notifications")
     .update({ read: true })
-    .eq('user_email', userEmail);
-  if (error) console.error('Error marking all notifications read:', error);
+    .eq("user_email", userEmail);
+  if (error) console.error("Error marking all notifications read:", error);
 };

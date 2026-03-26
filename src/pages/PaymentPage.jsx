@@ -202,7 +202,7 @@ const PaymentPage = () => {
 
     // Notify admin
     await createNotification(
-      "dommienik@yahoo.com",
+      process.env.REACT_APP_ADMIN_EMAIL || "admin@humaneyes.com", // ✅ Use env variable
       "new_order",
       `New Order: #${data.order_number}`,
       `${orderData.customer_email} placed a new order. ${orderData.word_count} words, $${orderData.total_price}`,

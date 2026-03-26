@@ -102,10 +102,6 @@ const Header = () => {
           <Link to="/" style={styles.link}>
             Home
           </Link>
-          <Link to="/track" style={styles.link}>
-            Track Order
-          </Link>
-
           {user ? (
             <div style={styles.userSection}>
               <NotificationBell userEmail={user.email} />

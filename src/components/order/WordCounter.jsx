@@ -31,17 +31,15 @@ const WordCounter = ({ text, onTextChange, onFileUpload }) => {
         const text = await file.text();
         onTextChange(text);
 
-        // Also upload to storage
         const timestamp = Date.now();
         const filePath = `originals/${timestamp}_${file.name}`;
-        const fileUrl = await uploadFile(file, "orders", filePath);
+        const fileUrl = await uploadFile(file, "orderfiles", filePath);
 
         if (onFileUpload) onFileUpload({ file, url: fileUrl });
       } else {
-        // Upload non-text files
         const timestamp = Date.now();
         const filePath = `originals/${timestamp}_${file.name}`;
-        const fileUrl = await uploadFile(file, "orders", filePath);
+        const fileUrl = await uploadFile(file, "orderfiles", filePath);
 
         if (onFileUpload) onFileUpload({ file, url: fileUrl });
         setShowManualInput(true);
@@ -422,7 +420,7 @@ const WordCounter = ({ text, onTextChange, onFileUpload }) => {
                 style={styles.modalTextarea}
                 value={tempText}
                 onChange={(e) => setTempText(e.target.value)}
-                placeholder="Paste your AI-generated text here... You can include formatting, paragraphs, bullet points, etc."
+                placeholder="Paste your AI-generated text here..."
                 autoFocus
               />
             </div>
@@ -445,8 +443,7 @@ const WordCounter = ({ text, onTextChange, onFileUpload }) => {
             <div style={styles.manualInstructions}>
               <strong>Important:</strong> Please count only the main content
               words. Exclude references, table of contents, cover pages, and
-              headers/footers. Accurate word count ensures proper pricing and
-              smooth project completion.
+              headers/footers.
             </div>
             <input
               type="number"
